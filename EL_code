@@ -1,0 +1,266 @@
+
+
+
+{1/27/22: Taken from kc_Volume_%complete
+}
+
+
+{Use on 1min bars. RadarScreen
+	For the ES, 35% of the total day(830-1500) volume happens from 830-1000.
+	When that is only 23% of the day.
+	--No need for intrabar updates.
+	--LOAD 20,000 1min bars. This makes for 14 day lookback, which is printed in printview.
+}
+Input:
+	ExtraHighBarrier(1.5),
+	HighBarrier(1.25),
+	LowBarrier(.75),
+	ExtraLowBarrier(.5);
+	
+once clearprintlog;
+[intrabarordergeneration = false];
+vars:
+	counter(0),
+	counterx(0),
+	volcount(0),
+	Arraycount1(0),
+	AvgVolumeMorning(0),
+	PercentComplete(0),
+	VolCount2(0),
+	Arraycount2(0),
+	AvgVolumeRestofDay(0),
+	PercentCompleteRestofDay(0),
+	PercentShouldBe_Morning(0),
+	Morning_to_Total(0),
+	PercentShouldBe_Total(0),
+	RestOfDay_to_Total(0),
+	VolCount2x(0),
+	Counterxx(0),
+	PercentCompleteTOTALx(0),
+	AvgVolumeTOTALx(0),
+	PercentShouldBe_Totalx(0),
+	Arraycount2x(0),
+	Tminus1(0),
+	Tminus2(0),
+	Tminus3(0),
+	//overnights
+	Countero(0),
+	VolCounto(0),
+	PercentCompleteo(0),
+	AvgVolumeMorningo(0),
+	PercentShouldBe_Morningo(0),
+	Morning_to_Totalo(0),
+	Arraycount1o(0),
+	ratio(0);
+Arrays:
+	volumeArray1[] (0),
+	volumeArray2[] (0),
+	volumeArray2x[] (0),
+	volumeArray2y[] (0),
+	volumeArray1o[] (0);
+	
+Morning_to_Total = iff(AvgVolumeTOTALx<>0, AvgVolumeMorning/AvgVolumeTOTALx,1)*100;
+RestOfDay_to_Total = (100 - Morning_to_Total);	
+//print(Morning_to_Total,"	,	",RestOfDay_to_Total);
+
+//compute average for just this session.
+if {date <> date[1] and} time > 800 and time <= 1000 then 
+Begin
+	if time = 801 then begin Counter=0; VolCount = 0; end;
+	counter = counter + 1;
+	volcount = volcount + kc_PriceChange; //This is like the only thing we changed to make this a volatility indicator instead of volume.
+	PercentComplete = iff(AvgVolumeMorning<>0, Volcount/AvgVolumeMorning , 1) *100;
+	PercentShouldBe_Morning = (counter/120) * 100;
+	Value1 = (Morning_to_Total * PercentComplete)/100;
+	Value2 = (Morning_to_Total * PercentShouldBe_Morning)/100;
+	//once this session is done, we add that one value to the array of other days. We will compute average of the collection. 
+	if time = 1000{counter = 18} then //from 830-10 is 18 bars. The last bar we bring our sum admit it into the average.
+	Begin
+		Arraycount1 = Arraycount1 + 1;
+		Array_setmaxindex(volumeArray1, Arraycount1);
+		volumeArray1[Arraycount1] = Volcount;
+		AvgVolumeMorning = (Array_sum(volumeArray1,1,Arraycount1)	/	Arraycount1);
+		//Avg weight of the morning session compared to the day as a whole. 
+	end;
+end;
+
+//Rest of day, Same way as the morning session.
+if {date = 1220118 and} time > 1000 and time <= 1500 then 
+Begin
+	if time = 1001 then begin Counterx=0; VolCount2 = 0; end;
+	counterx = counterx + 1;
+	VolCount2 = Volcount2 + kc_PriceChange;
+	PercentCompleteRestofDay = iff(AvgVolumeRestofDay<>0, Volcount2/AvgVolumeRestofDay , 1) *100;
+	PercentShouldBe_Total = (counterx/300)*100;
+	Value1 = ((RestOfDay_to_Total/100) * PercentCompleteRestofDay);
+	value4 = ((Morning_to_Total/100) * PercentComplete) + Value1;
+	
+	value3 = (RestOfDay_to_Total * PercentShouldBe_Total)/100;
+	Value2 = Morning_to_Total + value3;
+	//
+	Value1 = value4 /100 ; 
+	Value2 = (Morning_to_Total + value3) /100;
+	if time = 1500{counterx = 60} then
+	begin
+		Arraycount2 = Arraycount2 + 1;
+		Array_setmaxindex(volumeArray2, Arraycount2);
+		volumeArray2[Arraycount2] = VolCount2;
+		AvgVolumeRestofDay = (Array_sum(volumeArray2,1,Arraycount2)	/	Arraycount2);
+		//Value1 array (to find previous day performance.)
+		Array_setmaxindex(volumeArray2y, Arraycount2);
+		volumeArray2y[Arraycount2] = Value1;
+		If Arraycount2 > 3 then 
+		Begin
+			Tminus1 = volumeArray2y[Arraycount2-0];
+			Tminus2 = volumeArray2y[Arraycount2-1];
+			Tminus3 = volumeArray2y[Arraycount2-2];
+		End;
+	end;
+end;
+
+//FULL session. Just to grab the data for calculations in the other segments.
+if {date = 1220118 and} time > 800 and time <= 1500 then 
+Begin
+	counterxx = counterxx + 1;
+	VolCount2x = Volcount2x + kc_PriceChange;
+	//PercentCompleteTOTALx = iff(AvgVolumeTOTALx<>0, Volcount2x/AvgVolumeTOTALx , 1) *100;
+	//PercentShouldBe_Totalx = (counterxx/390)*100;
+	if time = 1500{counterx = 60} then
+	begin
+		Arraycount2x = Arraycount2x + 1;
+		Array_setmaxindex(volumeArray2x, Arraycount2x);
+		volumeArray2x[Arraycount2x] = VolCount2x;
+		AvgVolumeTOTALx = (Array_sum(volumeArray2x,1,Arraycount2x)	/	Arraycount2x);
+		Counterxx=0;
+		VolCount2x = 0;
+	end;
+end;
+
+If time > 800 and time <= 1000 then 
+Begin
+	Value1 = ((Morning_to_Total * PercentComplete)/100)/100;
+	Value2 = ((Morning_to_Total * PercentShouldBe_Morning)/100)/100;
+end;
+If time > 1000 and time <= 1500 then 
+Begin
+	Value1 = value4 /100 ; 
+	Value2 = (Morning_to_Total + value3) /100;
+End;
+Ratio = (iff(value2<>0,Value1/Value2,1));
+Plot4(Value1, !("% Complete"));
+Plot5(Value2, !("% ShouldBe"));
+Plot6(ratio, !("ratio"));
+//plot Tminus's. (the previous days PercentComplete)
+Plot3(Tminus1, !("T-1"));
+Plot2(Tminus2, !("T-2"));
+Plot1(Tminus3, !("T-3"));
+
+//Plots Colors
+if ratio >= ExtraHighBarrier then 
+begin
+	setplotBGColor(4, green);
+	setplotcolor(4, black);
+end;
+if ratio >= HighBarrier and ratio < ExtraHighBarrier then 
+begin
+	setplotBGColor(4, Yellow);
+	setplotcolor(4, black);
+end;
+if ratio <= LowBarrier then 
+begin
+	setplotBGColor(4, darkgray);
+	setplotcolor(4, black);
+end;
+if ratio <= ExtraLowBarrier then 
+begin
+	setplotBGColor(4, darkred);
+	setplotcolor(4, black);
+end;
+//
+if Tminus1 > ExtraHighBarrier then 
+begin
+	setplotBGColor(3, green);
+	setplotcolor(3, black);
+end;
+if Tminus1 >= HighBarrier and Tminus1 < ExtraHighBarrier then 
+begin
+	setplotBGColor(3, Yellow);
+	setplotcolor(3, black);
+end;
+if Tminus1 <= LowBarrier and Tminus1 >= ExtraLowBarrier then 
+begin
+	setplotBGColor(3, darkgray);
+	setplotcolor(3, black);
+end;
+if Tminus1 <= ExtraLowBarrier then 
+begin
+	setplotBGColor(3, darkred);
+	setplotcolor(3, black);
+end;
+//
+if Tminus2 > ExtraHighBarrier then 
+begin
+	setplotBGColor(2, green);
+	setplotcolor(2, black);
+end;
+if Tminus2 >= HighBarrier and Tminus2 < ExtraHighBarrier then 
+begin
+	setplotBGColor(2, Yellow);
+	setplotcolor(2, black);
+end;
+if Tminus2 <= LowBarrier and Tminus2 >= ExtraLowBarrier then 
+begin
+	setplotBGColor(2, darkgray);
+	setplotcolor(2, black);
+end;
+if Tminus2 <= ExtraLowBarrier then 
+begin
+	setplotBGColor(2, darkred);
+	setplotcolor(2, black);
+end;
+//
+if Tminus3 >= ExtraHighBarrier then 
+begin
+	setplotBGColor(1, green);
+	setplotcolor(1, black);
+end;
+if Tminus3 >= HighBarrier and Tminus3 < ExtraHighBarrier then 
+begin
+	setplotBGColor(1, Yellow);
+	setplotcolor(1, black);
+end;
+if Tminus3 <= LowBarrier and Tminus3 >= ExtraLowBarrier then 
+begin
+	setplotBGColor(1, darkgray);
+	setplotcolor(1, black);
+end;
+if Tminus3 <= ExtraLowBarrier then 
+begin
+	setplotBGColor(1, darkred);
+	setplotcolor(1, black);
+end;
+//
+//print(date,"	,	",AvgVolumeRestofDay,"	,	", AvgVolumeMorning,"	,	",RestOfDay_to_Total);
+//print(Arraycount2, "   # days looked back. ");
+
+
+//adding in the overnight session: How'd it trade overnight?
+if {date <> date[1] and} time > 0000 and time <= 700 then 
+Begin
+	if time = 0001 then begin Countero=0; VolCounto = 0; end;
+	countero = countero + 1;
+	volcounto = volcounto + kc_PriceChange; //This is like the only thing we changed to make this a volatility indicator instead of volume.
+	PercentCompleteo = iff(AvgVolumeMorningo<>0, Volcounto/AvgVolumeMorningo , 1) *100;
+	PercentShouldBe_Morningo = (countero/420) * 100;
+	Value1 = (PercentCompleteo)/100;
+	Value2 = (PercentShouldBe_Morningo)/100;
+	//once this session is done, we add that one value to the array of other days. We will compute average of the collection. 
+	if time = 700 {counter = 18} then //from 830-10 is 18 bars. The last bar we bring our sum admit it into the average.
+	Begin
+		Arraycount1o = Arraycount1o + 1;
+		Array_setmaxindex(volumeArray1o, Arraycount1o);
+		volumeArray1o[Arraycount1o] = Volcounto;
+		AvgVolumeMorningo = (Array_sum(volumeArray1o,1,Arraycount1o)	/	Arraycount1o);
+		//Avg weight of the morning session compared to the day as a whole. 
+	end;
+end;
